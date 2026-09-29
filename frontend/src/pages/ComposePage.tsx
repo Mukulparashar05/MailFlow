@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { campaignApi } from '../services/api';
 import { useToast } from '../hooks/useToast';
@@ -25,34 +25,81 @@ import {
 import { clsx } from 'clsx';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const STORAGE_KEY = 'outbox_compose_draft';
+
+interface DraftData {
+  subject: string;
+  body: string;
+  recipients: string[];
+  delayBetweenEmails: number;
+  rateLimit: number;
+  savedAt: number;
+}
+
+function getDefaultStartTime() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
 
 export function ComposePage() {
   const navigate = useNavigate();
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
+  // Load draft from localStorage on mount
+  const loadDraft = (): Partial<DraftData> => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const draft = JSON.parse(saved) as DraftData;
+        // Only restore if saved within last 24 hours
+        if (Date.now() - draft.savedAt < 24 * 60 * 60 * 1000) {
+          return draft;
+        }
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    return {};
+  };
+
+  const draft = loadDraft();
+
+  const [subject, setSubject] = useState(draft.subject || '');
+  const [body, setBody] = useState(draft.body || '');
   const [recipientInput, setRecipientInput] = useState('');
-  const [recipients, setRecipients] = useState<string[]>([]);
-  const [startAt, setStartAt] = useState(() => {
-    // Default to current local time
-    const now = new Date();
-    // Format as local datetime string for datetime-local input
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  });
-  const [delayBetweenEmails, setDelayBetweenEmails] = useState(30);
-  const [hourlyLimit, setHourlyLimit] = useState(100);
+  const [recipients, setRecipients] = useState<string[]>(draft.recipients || []);
+  const [startAt, setStartAt] = useState(getDefaultStartTime);
+  const [delayBetweenEmails, setDelayBetweenEmails] = useState(draft.delayBetweenEmails ?? 30);
+  const [rateLimit, setRateLimit] = useState(draft.rateLimit ?? 100);
   const [csvResult, setCsvResult] = useState<CsvParseResult | null>(null);
   const [csvLoading, setCsvLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPreview, setShowPreview] = useState(false);
+
+  // Save draft to localStorage when form changes
+  useEffect(() => {
+    const draftData: DraftData = {
+      subject,
+      body,
+      recipients,
+      delayBetweenEmails,
+      rateLimit,
+      savedAt: Date.now(),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(draftData));
+  }, [subject, body, recipients, delayBetweenEmails, rateLimit]);
+
+  // Clear draft after successful submission
+  const clearDraft = () => {
+    localStorage.removeItem(STORAGE_KEY);
+  };
 
   const addRecipient = useCallback(() => {
     const email = recipientInput.trim().toLowerCase();
@@ -123,10 +170,9 @@ export function ComposePage() {
     if (!body.trim()) newErrors.body = 'Email body is required';
     if (recipients.length === 0) newErrors.recipients = 'Add at least one recipient';
     if (!startAt) newErrors.startAt = 'Start time is required';
-    // Allow current time or future - just not past
+    
     const startDate = new Date(startAt);
     const now = new Date();
-    // Allow 1 minute buffer for form submission
     now.setMinutes(now.getMinutes() - 1);
     if (startDate < now) {
       newErrors.startAt = 'Start time cannot be in the past';
@@ -148,9 +194,10 @@ export function ComposePage() {
         recipients,
         startAt: new Date(startAt).toISOString(),
         delayBetweenEmails,
-        hourlyLimit,
+        hourlyLimit: rateLimit,
       });
 
+      clearDraft(); // Clear saved draft on success
       toast.success('Campaign scheduled!', res.data.message || 'Emails have been queued');
       navigate('/dashboard/scheduled');
     } catch (err: unknown) {
@@ -500,22 +547,22 @@ export function ComposePage() {
             <div className="space-y-2">
               <label className="label flex items-center gap-2">
                 <Gauge className="w-4 h-4 text-slate-500" />
-                Hourly Rate Limit
+                Rate Limit
               </label>
               <div className="relative">
                 <input
                   type="number"
                   min={1}
                   max={10000}
-                  value={hourlyLimit}
-                  onChange={(e) => setHourlyLimit(parseInt(e.target.value, 10) || 1)}
-                  className="input-field pr-20"
+                  value={rateLimit}
+                  onChange={(e) => setRateLimit(parseInt(e.target.value, 10) || 1)}
+                  className="input-field pr-24"
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm">
-                  per hour
+                  per minute
                 </span>
               </div>
-              <p className="text-xs text-slate-500">Max emails sent per hour</p>
+              <p className="text-xs text-slate-500">Max emails sent per minute</p>
             </div>
           </div>
 
@@ -551,7 +598,7 @@ export function ComposePage() {
                 </div>
                 <div className="p-3 rounded-lg bg-white/[0.03]">
                   <p className="text-xs text-slate-500 mb-1">Rate Limit</p>
-                  <p className="text-sm text-white font-medium">{hourlyLimit}/hour</p>
+                  <p className="text-sm text-white font-medium">{rateLimit}/min</p>
                 </div>
               </div>
             </div>

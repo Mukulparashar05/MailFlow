@@ -1,4 +1,4 @@
-# OutBox - Email Campaign Scheduler
+# MailFlow - Email Campaign Scheduler
 
 A production-ready, full-stack email campaign scheduler with distributed rate limiting, background job processing, and crash recovery.
 

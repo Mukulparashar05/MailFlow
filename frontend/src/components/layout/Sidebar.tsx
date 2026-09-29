@@ -40,7 +40,7 @@ export function Sidebar() {
             </div>
           </div>
           <div>
-            <h1 className="font-bold text-white text-xl tracking-tight">OutBox</h1>
+            <h1 className="font-bold text-white text-xl tracking-tight">MailFlow</h1>
             <p className="text-xs text-slate-500">Email Scheduler</p>
           </div>
         </div>

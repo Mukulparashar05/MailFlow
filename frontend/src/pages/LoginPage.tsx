@@ -53,7 +53,7 @@ export function LoginPage() {
               <Zap className="w-6 h-6 text-white" />
             </div>
           </div>
-          <span className="text-2xl font-bold text-white">OutBox</span>
+          <span className="text-2xl font-bold text-white">MailFlow</span>
         </div>
 
         {/* Hero text */}
@@ -112,7 +112,7 @@ export function LoginPage() {
                 <Zap className="w-6 h-6 text-white" />
               </div>
             </div>
-            <span className="text-2xl font-bold text-white">OutBox</span>
+            <span className="text-2xl font-bold text-white">MailFlow</span>
           </div>
 
           {/* Card */}

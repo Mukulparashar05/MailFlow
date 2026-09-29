@@ -14,7 +14,7 @@ export function LoadingPage() {
             <LoadingSpinner size="lg" />
           </div>
         </div>
-        <p className="text-slate-400 text-sm animate-pulse">Loading OutBox...</p>
+        <p className="text-slate-400 text-sm animate-pulse">Loading MailFlow...</p>
       </div>
     </div>
   );

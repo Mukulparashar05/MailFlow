@@ -25,7 +25,7 @@ import {
 import { clsx } from 'clsx';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const STORAGE_KEY = 'outbox_compose_draft';
+const STORAGE_KEY = 'mailflow_compose_draft';
 
 interface DraftData {
   subject: string;

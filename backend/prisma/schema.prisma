@@ -1,0 +1,104 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  googleId  String   @unique
+  email     String   @unique
+  name      String
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  campaigns       EmailCampaign[]
+  slackConnection SlackConnection?
+
+  @@index([googleId])
+  @@index([email])
+}
+
+model EmailCampaign {
+  id                  String         @id @default(cuid())
+  userId              String
+  subject             String
+  body                String
+  startAt             DateTime
+  delayBetweenEmails  Int            // seconds
+  hourlyLimit         Int
+  status              CampaignStatus @default(DRAFT)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailJobs EmailJob[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model EmailJob {
+  id                String      @id @default(cuid())
+  campaignId        String
+  recipientEmail    String
+  status            EmailStatus @default(PENDING)
+  scheduledAt       DateTime
+  sentAt            DateTime?
+  failedAt          DateTime?
+  attempts          Int         @default(0)
+  errorMessage      String?
+  bullJobId         String?
+  providerMessageId String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  campaign EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  // Idempotency: one email per campaign per recipient
+  @@unique([campaignId, recipientEmail])
+  @@index([campaignId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([bullJobId])
+}
+
+model SlackConnection {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  slackUserId String
+  accessToken String   // stored securely - never logged
+  teamId      String
+  teamName    String?
+  channelId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  COMPLETED
+  FAILED
+  PAUSED
+}
+
+enum EmailStatus {
+  PENDING
+  SCHEDULED
+  PROCESSING
+  SENT
+  FAILED
+}

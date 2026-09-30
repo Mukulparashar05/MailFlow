@@ -12,6 +12,8 @@ export async function getMailTransporter(): Promise<Transporter> {
   const pass = process.env.SMTP_PASSWORD;
   const secure = process.env.SMTP_SECURE === 'true';
 
+  logger.info('Configuring SMTP transporter', { host, port, user: user ? '***' : 'NOT SET', secure });
+
   if (!host || !user || !pass) {
     // Auto-create Ethereal test account for development
     logger.warn('SMTP credentials not configured — creating Ethereal test account');
@@ -33,10 +35,24 @@ export async function getMailTransporter(): Promise<Transporter> {
       port,
       secure,
       auth: { user, pass },
+      connectionTimeout: 10000, // 10 seconds
+      greetingTimeout: 10000,
+      socketTimeout: 30000,
     });
+    logger.info('SMTP transporter configured with provided credentials');
   }
 
-  await transporter.verify();
-  logger.info('SMTP transporter verified and ready');
+  try {
+    await transporter.verify();
+    logger.info('SMTP transporter verified and ready');
+  } catch (verifyError) {
+    logger.error('SMTP verification failed', { 
+      error: verifyError instanceof Error ? verifyError.message : 'Unknown',
+      host, 
+      port 
+    });
+    throw verifyError;
+  }
+  
   return transporter;
 }

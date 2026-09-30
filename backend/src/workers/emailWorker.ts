@@ -162,11 +162,13 @@ async function processEmailJob(job: Job<EmailJobPayload>): Promise<void> {
     await checkAndUpdateCampaignStatus(campaign.id);
   } catch (sendError) {
     const errorMessage = sendError instanceof Error ? sendError.message : 'Unknown error';
+    const errorStack = sendError instanceof Error ? sendError.stack : '';
 
     logger.error('Email send failed', {
       emailJobId,
       to: emailJob.recipientEmail,
       error: errorMessage,
+      stack: errorStack,
       attempt: job.attemptsMade,
     });
 

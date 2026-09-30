@@ -12,7 +12,7 @@ export async function getMailTransporter(): Promise<Transporter> {
   const pass = process.env.SMTP_PASSWORD;
   const secure = process.env.SMTP_SECURE === 'true';
 
-  logger.info('Configuring SMTP transporter', { host, port, user: user ? '***' : 'NOT SET', secure });
+  logger.info('Configuring SMTP transporter', { host, port, user: user ? user.substring(0, 5) + '***' : 'NOT SET', secure });
 
   if (!host || !user || !pass) {
     // Auto-create Ethereal test account for development
@@ -35,24 +35,18 @@ export async function getMailTransporter(): Promise<Transporter> {
       port,
       secure,
       auth: { user, pass },
-      connectionTimeout: 10000, // 10 seconds
-      greetingTimeout: 10000,
-      socketTimeout: 30000,
+      connectionTimeout: 30000, // 30 seconds
+      greetingTimeout: 30000,
+      socketTimeout: 60000,
+      pool: true, // Use connection pooling
+      maxConnections: 5,
     });
     logger.info('SMTP transporter configured with provided credentials');
   }
 
-  try {
-    await transporter.verify();
-    logger.info('SMTP transporter verified and ready');
-  } catch (verifyError) {
-    logger.error('SMTP verification failed', { 
-      error: verifyError instanceof Error ? verifyError.message : 'Unknown',
-      host, 
-      port 
-    });
-    throw verifyError;
-  }
+  // Skip verification - let it fail on first send if there's an issue
+  // This avoids startup timeouts
+  logger.info('SMTP transporter ready (verification skipped for faster startup)');
   
   return transporter;
 }

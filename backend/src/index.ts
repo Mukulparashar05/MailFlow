@@ -20,6 +20,9 @@ const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
+// Trust proxy (required for secure cookies behind Railway/Vercel proxy)
+app.set('trust proxy', 1);
+
 // Security
 app.use(
   helmet({
@@ -52,7 +55,9 @@ app.use(
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+      // Use 'none' for cross-origin (Vercel frontend + Railway backend)
+      // 'none' requires secure: true (HTTPS)
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     },
   }),
 );

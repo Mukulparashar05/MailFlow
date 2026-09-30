@@ -217,11 +217,6 @@ SMTP_USER=your_ethereal_user
 SMTP_PASSWORD=your_ethereal_password
 SMTP_FROM="OutBox <noreply@outbox.dev>"
 
-# === SLACK (Optional) ===
-SLACK_CLIENT_ID=your_slack_client_id
-SLACK_CLIENT_SECRET=your_slack_client_secret
-SLACK_REDIRECT_URI=http://localhost:3001/api/slack/callback
-
 # === WORKER ===
 WORKER_CONCURRENCY=5
 
@@ -369,7 +364,6 @@ When limit exceeded:
   - Job is NOT marked as failed
   - New delayed job created for next window
   - Original job completes successfully
-  - Slack notification sent (once per window)
 
 ┌─────────────────────────────────────────────────────────────────┐
 │                       CONCURRENCY                                │
@@ -410,7 +404,6 @@ Race Condition Prevention:
 | **Idempotency** | DB status check before send + unique jobIds | `emailWorker.ts` |
 | **State Machine** | PENDING → SCHEDULED → PROCESSING → SENT/FAILED | Prisma schema |
 | **Google OAuth** | Passport.js strategy | `passport.ts`, `authController.ts` |
-| **Slack Notifications** | OAuth + webhook on rate limit | `slackService.ts`, `slackController.ts` |
 | **CSV Parsing** | Server-side validation | `csvParser.ts` |
 | **Graceful Shutdown** | SIGTERM/SIGINT handlers | `index.ts`, `emailWorker.ts` |
 
@@ -442,8 +435,6 @@ Race Condition Prevention:
 | POST | `/api/campaigns/parse-csv` | Parse CSV |
 | GET | `/api/emails/scheduled` | Scheduled emails |
 | GET | `/api/emails/sent` | Sent emails |
-| GET | `/api/slack/status` | Slack connection status |
-| GET | `/api/slack/connect` | Initiate Slack OAuth |
 
 ---
 
@@ -501,8 +492,7 @@ outbox/
 │   │   ├── services/        # Business logic
 │   │   │   ├── emailService.ts
 │   │   │   ├── rateLimiter.ts
-│   │   │   ├── schedulerService.ts
-│   │   │   └── slackService.ts
+│   │   │   └── schedulerService.ts
 │   │   ├── workers/         # BullMQ processors
 │   │   └── index.ts         # Express app entry
 │   ├── prisma/

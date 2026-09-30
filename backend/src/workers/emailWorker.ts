@@ -7,7 +7,6 @@ import { QUEUE_NAME, EmailJobPayload, getEmailQueue } from '../config/queue';
 import { sendEmail } from '../services/emailService';
 import { checkAndIncrementRateLimit } from '../services/rateLimiter';
 import { reconcileScheduledJobs } from '../services/schedulerService';
-import { sendSlackNotification } from '../services/slackService';
 import { logger } from '../config/logger';
 
 const WORKER_CONCURRENCY = parseInt(process.env.WORKER_CONCURRENCY || '5', 10);
@@ -19,7 +18,6 @@ const WORKER_CONCURRENCY = parseInt(process.env.WORKER_CONCURRENCY || '5', 10);
  * 1. IDEMPOTENCY: Always checks DB status before sending
  * 2. RATE LIMITING: Atomic Redis counter per campaign per hour
  * 3. DUPLICATE PROTECTION: DB unique constraint + state machine
- * 4. GRACEFUL ERRORS: Slack errors never crash the worker
  */
 async function processEmailJob(job: Job<EmailJobPayload>): Promise<void> {
   const { emailJobId } = job.data;
@@ -85,24 +83,6 @@ async function processEmailJob(job: Job<EmailJobPayload>): Promise<void> {
       delayMs,
       nextWindowAt: rateLimitResult.nextWindowAt,
     });
-
-    // Send Slack notification if connected (only once per campaign per hour)
-    const slackNotifKey = `slack_notif:${campaign.id}:${Math.floor(Date.now() / 3600000)}`;
-    const redis = getRedisClient();
-    const alreadyNotified = await redis.get(slackNotifKey);
-    
-    if (!alreadyNotified) {
-      try {
-        await sendSlackNotification(campaign.userId, {
-          text: `⚠️ *OutBox Rate Limit Reached*\nCampaign: *${campaign.subject}*\nHourly limit of ${campaign.hourlyLimit} emails reached.\nNext window opens at ${rateLimitResult.nextWindowAt.toLocaleTimeString()}.\nScheduled emails will resume automatically.`,
-        });
-        await redis.setex(slackNotifKey, 3600, '1'); // Don't notify again for 1 hour
-      } catch (slackErr) {
-        logger.error('Failed to send Slack rate-limit notification', {
-          error: slackErr instanceof Error ? slackErr.message : 'Unknown',
-        });
-      }
-    }
 
     return; // Job complete - new delayed job will handle it
   }

@@ -143,12 +143,10 @@ This demonstrates **crash recovery** - a key production feature!
   ```
 
 3. **Wait ~60 seconds** → Next batch of 3 emails sends
-4. Check **Slack** (if connected) - rate limit notification received!
 
 ### What to show evaluator:
 - ✅ Distributed rate limiting with Redis
 - ✅ Automatic rescheduling (not failed, just delayed)
-- ✅ Slack notification on rate limit
 - ✅ No emails lost, all eventually delivered
 
 ---

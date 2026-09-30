@@ -69,7 +69,7 @@ export function LoginPage() {
             </h2>
             <p className="text-slate-400 text-lg max-w-md mt-6">
               Schedule and automate email campaigns with distributed rate limiting,
-              idempotent delivery, and real-time Slack notifications.
+              idempotent delivery, and real-time delivery tracking.
             </p>
           </div>
 

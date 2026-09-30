@@ -4,11 +4,6 @@ export interface User {
   name: string;
   avatar?: string;
   createdAt: string;
-  slackConnection?: {
-    teamName: string;
-    slackUserId: string;
-    createdAt: string;
-  } | null;
 }
 
 export type CampaignStatus = 'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'PAUSED';
@@ -44,13 +39,6 @@ export interface EmailJob {
   createdAt: string;
   updatedAt: string;
   campaign?: Pick<Campaign, 'id' | 'subject' | 'status' | 'hourlyLimit'>;
-}
-
-export interface SlackStatus {
-  connected: boolean;
-  teamName: string | null;
-  slackUserId: string | null;
-  connectedAt: string | null;
 }
 
 export interface CreateCampaignInput {

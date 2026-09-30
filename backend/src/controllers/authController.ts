@@ -15,13 +15,6 @@ export async function getMe(req: Request, res: Response): Promise<void> {
       name: true,
       avatar: true,
       createdAt: true,
-      slackConnection: {
-        select: {
-          teamName: true,
-          slackUserId: true,
-          createdAt: true,
-        },
-      },
     },
   });
 

@@ -2,8 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
-import { campaignApi, emailApi, slackApi } from '../services/api';
-import type { Campaign, SlackStatus } from '../types';
+import { campaignApi, emailApi } from '../services/api';
+import type { Campaign } from '../types';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import {
   Mail,
@@ -12,8 +12,6 @@ import {
   Plus,
   TrendingUp,
   Users,
-  Slack,
-  Bell,
   ChevronRight,
   Zap,
   Sparkles,
@@ -156,35 +154,19 @@ function StatCard({
 }
 
 export function DashboardPage() {
-  const { user, refetch } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [slackStatus, setSlackStatus] = useState<SlackStatus | null>(null);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const slackResult = params.get('slack');
-    if (slackResult === 'connected') {
-      toast.success('Slack connected!', 'You will receive notifications when rate limits are reached.');
-      refetch();
-      window.history.replaceState({}, '', '/dashboard');
-    } else if (slackResult === 'error') {
-      const reason = params.get('reason') || 'Unknown error';
-      toast.error('Slack connection failed', reason);
-      window.history.replaceState({}, '', '/dashboard');
-    }
-  }, []);
 
   useEffect(() => {
     async function load() {
       try {
-        const [campaignsRes, scheduledRes, sentRes, slackRes] = await Promise.all([
+        const [campaignsRes, scheduledRes, sentRes] = await Promise.all([
           campaignApi.list(),
           emailApi.scheduled(),
           emailApi.sent(),
-          slackApi.status(),
         ]);
 
         const campaigns = campaignsRes.data.data || [];
@@ -194,7 +176,6 @@ export function DashboardPage() {
           sentEmails: sentRes.data.data?.length || 0,
           recentCampaigns: campaigns.slice(0, 5),
         });
-        setSlackStatus(slackRes.data.data || null);
       } catch (err) {
         toast.error('Failed to load dashboard data');
       } finally {
@@ -236,29 +217,6 @@ export function DashboardPage() {
           <span>New Campaign</span>
         </button>
       </div>
-
-      {/* Slack Banner */}
-      {!loading && !slackStatus?.connected && (
-        <div 
-          className="glass-card p-5 border-amber-500/20 bg-gradient-to-r from-amber-500/5 to-orange-500/5 flex items-center justify-between gap-4 opacity-0 animate-slide-up"
-          style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center">
-              <Bell className="w-6 h-6 text-amber-400" />
-            </div>
-            <div>
-              <p className="font-semibold text-white">Enable Slack Notifications</p>
-              <p className="text-sm text-slate-400">Get real-time alerts when campaigns hit rate limits</p>
-            </div>
-          </div>
-          <a href="/api/slack/connect" className="btn-secondary group">
-            <Slack className="w-4 h-4" />
-            <span>Connect</span>
-            <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-          </a>
-        </div>
-      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-5">

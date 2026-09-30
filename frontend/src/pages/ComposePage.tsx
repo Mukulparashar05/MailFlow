@@ -20,11 +20,18 @@ import {
   Zap,
   Eye,
   Code,
+  Info,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const STORAGE_KEY = 'mailflow_compose_draft';
+
+// Demo mode: Resend's free tier only delivers to the account owner's address
+// until a custom domain is verified. Set VITE_DEMO_RECIPIENT="" to turn this off.
+const DEMO_RECIPIENT = (
+  import.meta.env.VITE_DEMO_RECIPIENT ?? 'mukulparashar0512@gmail.com'
+).trim().toLowerCase();
 
 interface DraftData {
   subject: string;
@@ -73,6 +80,8 @@ export function ComposePage() {
   const [body, setBody] = useState(draft.body || '');
   const [recipientInput, setRecipientInput] = useState('');
   const [recipients, setRecipients] = useState<string[]>(draft.recipients || []);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState(-1);
   const [startAt, setStartAt] = useState(getDefaultStartTime);
   const [delayBetweenEmails, setDelayBetweenEmails] = useState(draft.delayBetweenEmails ?? 30);
   const [rateLimit, setRateLimit] = useState(draft.rateLimit ?? 100);
@@ -122,7 +131,48 @@ export function ComposePage() {
     setRecipients((prev) => prev.filter((r) => r !== email));
   };
 
+  // Suggest the demo address while it isn't added yet and matches what's typed
+  const recipientQuery = recipientInput.trim().toLowerCase();
+  const suggestions =
+    DEMO_RECIPIENT && !recipients.includes(DEMO_RECIPIENT) && DEMO_RECIPIENT.includes(recipientQuery)
+      ? [DEMO_RECIPIENT]
+      : [];
+  const suggestionsOpen = showSuggestions && suggestions.length > 0;
+
+  const closeSuggestions = () => {
+    setShowSuggestions(false);
+    setActiveSuggestion(-1);
+  };
+
+  const selectSuggestion = (email: string) => {
+    setRecipients((prev) => (prev.includes(email) ? prev : [...prev, email]));
+    setRecipientInput('');
+    setErrors((e) => ({ ...e, recipientInput: '' }));
+    closeSuggestions();
+  };
+
   const handleRecipientKeyDown = (e: React.KeyboardEvent) => {
+    if (suggestionsOpen) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActiveSuggestion((i) => (i + 1) % suggestions.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActiveSuggestion((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
+        return;
+      }
+      if (e.key === 'Escape') {
+        closeSuggestions();
+        return;
+      }
+      if (e.key === 'Enter' && activeSuggestion >= 0) {
+        e.preventDefault();
+        selectSuggestion(suggestions[activeSuggestion]);
+        return;
+      }
+    }
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
       addRecipient();
@@ -265,14 +315,67 @@ export function ComposePage() {
               <input
                 type="text"
                 placeholder="Enter email address..."
+                aria-label="Recipient email address"
+                autoComplete="off"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded={suggestionsOpen}
+                aria-controls="recipient-suggestions"
+                aria-activedescendant={
+                  suggestionsOpen && activeSuggestion >= 0
+                    ? `recipient-suggestion-${activeSuggestion}`
+                    : undefined
+                }
                 value={recipientInput}
-                onChange={(e) => setRecipientInput(e.target.value)}
+                onChange={(e) => {
+                  setRecipientInput(e.target.value);
+                  setShowSuggestions(true);
+                  setActiveSuggestion(-1);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                onClick={() => setShowSuggestions(true)}
+                onBlur={closeSuggestions}
                 onKeyDown={handleRecipientKeyDown}
                 className={clsx(
                   'input-field pl-12',
                   errors.recipientInput && 'border-rose-500/50 focus:border-rose-500/50 focus:ring-rose-500/20'
                 )}
               />
+
+              {/* Suggestions dropdown (demo recipient) */}
+              {suggestionsOpen && (
+                <ul
+                  id="recipient-suggestions"
+                  role="listbox"
+                  aria-label="Suggested recipients"
+                  className="absolute left-0 right-0 top-full mt-2 z-20 p-1.5 rounded-xl bg-dark-900 border border-white/10 shadow-xl shadow-black/40"
+                >
+                  {suggestions.map((email, index) => (
+                    <li
+                      key={email}
+                      id={`recipient-suggestion-${index}`}
+                      role="option"
+                      aria-selected={index === activeSuggestion}
+                      // Keep focus in the input so blur doesn't close the list before the click lands
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => selectSuggestion(email)}
+                      onMouseEnter={() => setActiveSuggestion(index)}
+                      className={clsx(
+                        'flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-colors',
+                        index === activeSuggestion
+                          ? 'bg-primary-500/10 text-white'
+                          : 'text-slate-300 hover:bg-white/[0.04]'
+                      )}
+                    >
+                      <span className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
+                        <Mail className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+                      </span>
+                      <span className="flex-1 truncate">{email}</span>
+                      <span className="text-xs font-medium text-emerald-400">Demo recipient</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
             <button
               type="button"
@@ -288,6 +391,23 @@ export function ComposePage() {
               <AlertTriangle className="w-4 h-4" />
               {errors.recipientInput}
             </p>
+          )}
+
+          {DEMO_RECIPIENT && (
+            <div
+              role="note"
+              className="mb-4 flex gap-3 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 text-sm"
+            >
+              <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
+              <p className="text-slate-400">
+                <span className="font-semibold text-amber-400">Demo mode:</span> emails are only
+                delivered to <span className="text-slate-200">{DEMO_RECIPIENT}</span>. Click the
+                email field above to pick it. Our host
+                (Railway) blocks outbound SMTP, so mail is sent through the Resend API, and
+                Resend&apos;s free tier only delivers to the account owner until a custom domain is
+                verified. Other addresses will still be scheduled, but their sends will fail.
+              </p>
+            </div>
           )}
 
           {/* CSV Upload Zone */}

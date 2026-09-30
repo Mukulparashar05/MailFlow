@@ -7,10 +7,8 @@ import {
   Clock,
   Plus,
   LogOut,
-  Slack,
   Zap,
   ChevronRight,
-  Sparkles,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -105,38 +103,6 @@ export function Sidebar() {
           );
         })}
       </nav>
-
-      {/* Slack connection */}
-      <div className="relative p-4 border-t border-white/[0.06]">
-        {user?.slackConnection ? (
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-              <Slack className="w-4 h-4 text-emerald-400" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-emerald-400">Connected</p>
-              <p className="text-xs text-slate-500 truncate">{user.slackConnection.teamName}</p>
-            </div>
-            <Sparkles className="w-4 h-4 text-emerald-400/50" />
-          </div>
-        ) : (
-          <a
-            href="/api/slack/connect"
-            className="group flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-amber-500/30 hover:bg-amber-500/5 transition-all duration-300"
-          >
-            <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center group-hover:bg-amber-500/20 transition-colors">
-              <Slack className="w-4 h-4 text-amber-400" />
-            </div>
-            <div className="flex-1">
-              <p className="text-xs font-semibold text-slate-300 group-hover:text-amber-400 transition-colors">
-                Connect Slack
-              </p>
-              <p className="text-xs text-slate-600">Get notifications</p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all" />
-          </a>
-        )}
-      </div>
 
       {/* User profile */}
       <div className="relative p-4 border-t border-white/[0.06]">

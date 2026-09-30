@@ -14,7 +14,6 @@ import { logger } from './config/logger';
 import authRoutes from './routes/auth';
 import campaignRoutes from './routes/campaigns';
 import emailRoutes from './routes/emails';
-import slackRoutes from './routes/slack';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -82,7 +81,6 @@ app.use('/auth', authRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/emails', emailRoutes);
-app.use('/api/slack', slackRoutes);
 
 // Error handling
 app.use(notFoundHandler);

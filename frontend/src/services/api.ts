@@ -4,7 +4,6 @@ import type {
   Campaign,
   EmailJob,
   CreateCampaignInput,
-  SlackStatus,
   CsvParseResult,
   ApiResponse,
 } from '../types';
@@ -35,7 +34,7 @@ api.interceptors.response.use(
 
 // Auth
 export const authApi = {
-  getMe: () => api.get<ApiResponse<User & { slackConnection: SlackStatus | null }>>('/api/auth/me'),
+  getMe: () => api.get<ApiResponse<User>>('/api/auth/me'),
   logout: () => api.post<ApiResponse<void>>('/api/auth/logout'),
   devLogin: (email?: string, name?: string) =>
     api.post<ApiResponse<User>>('/api/auth/dev-login', { email, name }),
@@ -57,13 +56,6 @@ export const emailApi = {
   scheduled: () => api.get<ApiResponse<EmailJob[]>>('/api/emails/scheduled'),
   sent: () => api.get<ApiResponse<EmailJob[]>>('/api/emails/sent'),
   failed: () => api.get<ApiResponse<EmailJob[]>>('/api/emails/failed'),
-};
-
-// Slack
-export const slackApi = {
-  status: () => api.get<ApiResponse<SlackStatus>>('/api/slack/status'),
-  connectUrl: `${API_BASE_URL}/api/slack/connect`,
-  disconnect: () => api.post<ApiResponse<void>>('/api/slack/disconnect'),
 };
 
 export default api;

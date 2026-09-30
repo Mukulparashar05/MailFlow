@@ -2,6 +2,7 @@ import { Router } from 'express';
 import passport from 'passport';
 import { getMe, logout, devLogin } from '../controllers/authController';
 import { requireAuth } from '../middleware/auth';
+import { logger } from '../config/logger';
 
 const router = Router();
 
@@ -24,21 +25,22 @@ router.get(
 router.get(
   '/google/callback',
   (req, res, next) => {
-    passport.authenticate('google', (err: Error | null, user: Express.User | false | null, info: unknown) => {
-      if (err) {
-        console.error('OAuth callback error:', err);
-        return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=auth_failed&reason=${encodeURIComponent(err.message)}`);
-      }
-      if (!user) {
-        console.error('OAuth callback: no user returned', info);
-        return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=auth_failed&reason=no_user`);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+    passport.authenticate('google', (err: Error | null, user: Express.User | false | null) => {
+      // Log the real cause server-side; the browser only gets a generic error flag
+      if (err || !user) {
+        logger.error('Google OAuth callback failed', {
+          error: err ? err.message : 'No user returned from Google',
+        });
+        return res.redirect(`${frontendUrl}/login?error=auth_failed`);
       }
       req.logIn(user, (loginErr) => {
         if (loginErr) {
-          console.error('OAuth login error:', loginErr);
-          return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=auth_failed&reason=${encodeURIComponent(loginErr.message)}`);
+          logger.error('Session login failed after Google OAuth', { error: loginErr.message });
+          return res.redirect(`${frontendUrl}/login?error=auth_failed`);
         }
-        return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard`);
+        return res.redirect(`${frontendUrl}/dashboard`);
       });
     })(req, res, next);
   },

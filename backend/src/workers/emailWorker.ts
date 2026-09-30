@@ -16,7 +16,7 @@ const WORKER_CONCURRENCY = parseInt(process.env.WORKER_CONCURRENCY || '5', 10);
  *
  * Processes BullMQ jobs with the following guarantees:
  * 1. IDEMPOTENCY: Always checks DB status before sending
- * 2. RATE LIMITING: Atomic Redis counter per campaign per hour
+ * 2. RATE LIMITING: Atomic Redis counter per campaign per window (default 1 minute)
  * 3. DUPLICATE PROTECTION: DB unique constraint + state machine
  */
 async function processEmailJob(job: Job<EmailJobPayload>): Promise<void> {

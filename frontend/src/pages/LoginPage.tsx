@@ -7,7 +7,7 @@ import { Mail, Shield, Zap, Clock, BarChart3, Sparkles, ArrowRight } from 'lucid
 
 const features = [
   { icon: Mail, title: 'Smart Scheduling', desc: 'Schedule emails with precise delays', color: 'primary' },
-  { icon: Clock, title: 'Rate Limiting', desc: 'Distributed hourly rate control', color: 'sky' },
+  { icon: Clock, title: 'Rate Limiting', desc: 'Distributed per-minute rate control', color: 'sky' },
   { icon: Shield, title: 'Idempotent Sends', desc: 'Never send the same email twice', color: 'emerald' },
   { icon: BarChart3, title: 'Real-time Tracking', desc: 'Monitor sent and scheduled emails', color: 'violet' },
 ];

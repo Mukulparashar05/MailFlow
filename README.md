@@ -12,14 +12,30 @@ A production-ready, full-stack email campaign scheduler with distributed rate li
 
 ## Table of Contents
 
-1. [Quick Start](#quick-start)
-2. [Backend Setup](#backend-setup)
-3. [Frontend Setup](#frontend-setup)
-4. [Email Configuration (Ethereal)](#email-configuration-ethereal)
-5. [Environment Variables](#environment-variables)
-6. [Architecture Overview](#architecture-overview)
-7. [Features Implemented](#features-implemented)
-8. [Assumptions & Trade-offs](#assumptions--trade-offs)
+1. [Live Demo](#live-demo)
+2. [Quick Start](#quick-start)
+3. [Backend Setup](#backend-setup)
+4. [Frontend Setup](#frontend-setup)
+5. [Email Configuration (Ethereal)](#email-configuration-ethereal)
+6. [Environment Variables](#environment-variables)
+7. [Architecture Overview](#architecture-overview)
+8. [Deployment (Vercel + Railway)](#deployment-vercel--railway)
+9. [Demo Walkthrough](#demo-walkthrough)
+10. [Features Implemented](#features-implemented)
+11. [Assumptions & Trade-offs](#assumptions--trade-offs)
+
+---
+
+## Live Demo
+
+| | URL |
+|---|---|
+| Frontend (Vercel) | https://mail-flow-sigma.vercel.app |
+| Backend health (Railway) | https://mailflow-production-20df.up.railway.app/health |
+
+Sign in with any Google account.
+
+> **Demo mode: email delivery is limited to one address.** Railway blocks outbound SMTP, so production sends through the [Resend](https://resend.com) HTTP API. Resend's free tier only delivers to the account owner's address (`mukulparashar0512@gmail.com`) until a custom domain is verified. The Compose page suggests that address when you click the recipient field. Emails to other addresses are still scheduled and rate limited, but the send step fails and they end up marked Failed. Running locally with Ethereal has no recipient restriction.
 
 ---
 
@@ -138,10 +154,17 @@ npm run preview
 
 ### Environment Variables (Frontend)
 
-For production deployment, create `.env` in frontend:
+No frontend env vars are required. The app calls relative `/api` and `/auth` paths:
+- Locally, the Vite dev server proxies them to `http://localhost:3001` (`vite.config.ts`).
+- On Vercel, `frontend/vercel.json` rewrites them to the Railway backend.
+
+Optional (`frontend/.env`):
 
 ```env
-VITE_API_URL=https://your-backend-url.com
+# Call a backend directly instead of the proxy. Leave unset in production (see Deployment).
+VITE_API_URL=
+# Suggested recipient on the Compose page; set to "" to turn off the demo-mode hint
+VITE_DEMO_RECIPIENT=
 ```
 
 ---
@@ -171,9 +194,9 @@ VITE_API_URL=https://your-backend-url.com
    - Check worker logs for "previewUrl"
    - Or login to https://ethereal.email/messages
 
-### Production Email (Gmail)
+### Real Delivery via Gmail SMTP
 
-For real email delivery:
+Works locally or on any host that allows outbound SMTP:
 
 1. Enable 2FA on Gmail
 2. Generate App Password: https://myaccount.google.com/apppasswords
@@ -186,6 +209,17 @@ For real email delivery:
    SMTP_PASSWORD=your_app_password
    SMTP_FROM="OutBox <your.email@gmail.com>"
    ```
+
+### Production Email (Resend API)
+
+Railway blocks outbound SMTP ports, so SMTP connections from the deployed worker time out. When `RESEND_API_KEY` is set, the worker sends through Resend's HTTP API instead (`emailService.ts`); otherwise it uses SMTP.
+
+```env
+RESEND_API_KEY=re_your_resend_api_key
+SMTP_FROM="MailFlow <onboarding@resend.dev>"
+```
+
+On Resend's free tier, mail is only delivered to the account owner's address until a domain is verified at https://resend.com/domains.
 
 ---
 
@@ -217,11 +251,15 @@ SMTP_USER=your_ethereal_user
 SMTP_PASSWORD=your_ethereal_password
 SMTP_FROM="OutBox <noreply@outbox.dev>"
 
+# === RESEND (optional, production) ===
+# If set, emails go through Resend's HTTP API instead of SMTP
+# RESEND_API_KEY=re_your_resend_api_key
+
 # === WORKER ===
 WORKER_CONCURRENCY=5
 
 # === RATE LIMITING ===
-# 60 = per minute (demo), 3600 = per hour (production)
+# 60 = per minute (default), 3600 = per hour
 RATE_LIMIT_WINDOW_SECONDS=60
 
 # === URLS ===
@@ -237,6 +275,8 @@ PORT=3001
 2. Create OAuth 2.0 Client ID (Web application)
 3. Add authorized origins: `http://localhost:5173`
 4. Add redirect URI: `http://localhost:3001/auth/google/callback`
+5. For production, also add origin `https://mail-flow-sigma.vercel.app` and redirect URI `https://mail-flow-sigma.vercel.app/auth/google/callback` (the callback goes through the Vercel proxy)
+6. Set the OAuth consent screen's publishing status to "In production" so any Google account can sign in
 
 ---
 
@@ -277,8 +317,9 @@ PORT=3001
                                                      │
                                                      ▼
                                           ┌─────────────────────┐
-                                          │    SMTP Server      │
-                                          │  (Ethereal/Gmail)   │
+                                          │  Email provider     │
+                                          │  SMTP (Ethereal) or │
+                                          │  Resend API (prod)  │
                                           └─────────────────────┘
 ```
 
@@ -305,7 +346,7 @@ PORT=3001
    a. Check idempotency (skip if SENT)
    b. Check rate limit (reschedule if exceeded)
    c. Mark PROCESSING
-   d. Send via SMTP
+   d. Send via SMTP, or the Resend API when RESEND_API_KEY is set
    e. Mark SENT or FAILED
 ```
 
@@ -347,10 +388,10 @@ WHY IT WORKS:
 │                  DISTRIBUTED RATE LIMITING                       │
 └─────────────────────────────────────────────────────────────────┘
 
-Algorithm: Token Bucket with Redis Atomic Operations
+Algorithm: Fixed-window counter per campaign, in an atomic Redis Lua script
 
 Key Format: rate_limit:{campaignId}:{windowTimestamp}
-Window: 60 seconds (configurable)
+Window: 60 seconds by default (RATE_LIMIT_WINDOW_SECONDS)
 
 ┌─────────────────────────────────────────────────────────────────┐
 │                      Lua Script (Atomic)                         │
@@ -391,6 +432,48 @@ Race Condition Prevention:
 
 ---
 
+## Deployment (Vercel + Railway)
+
+```
+Browser ──> Vercel (mail-flow-sigma.vercel.app)
+              ├── static React build
+              └── rewrites /api/* and /auth/* ──> Railway: MailFlow API (Express)
+                                                        │
+                                           Railway: PostgreSQL + Redis
+                                                        │
+                                           Railway: MailFlow-Worker (BullMQ) ──> Resend API
+```
+
+**Why the Vercel rewrites:** the API sets the session cookie. If the browser called Railway directly, that cookie would belong to `railway.app` while the page runs on `vercel.app`. Brave, Safari and Incognito block such third-party cookies, which caused a login loop. Proxying through Vercel makes the cookie first-party.
+
+### Railway (backend)
+
+| Service | Root directory | Start command | Key variables |
+|---------|----------------|---------------|---------------|
+| MailFlow (API) | `/backend` | `npm start` | `DATABASE_URL`, `REDIS_URL`, `SESSION_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL=https://mail-flow-sigma.vercel.app/auth/google/callback`, `FRONTEND_URL=https://mail-flow-sigma.vercel.app`, `NODE_ENV=production` |
+| MailFlow-Worker | `/backend` | `npm run start:worker` | `DATABASE_URL`, `REDIS_URL`, `RESEND_API_KEY`, `SMTP_FROM`, `NODE_ENV=production`, optional `WORKER_CONCURRENCY`, `RATE_LIMIT_WINDOW_SECONDS` |
+| PostgreSQL, Redis | Railway databases | - | - |
+
+- The build command comes from `railway.json` (`npm run build` = `prisma generate && tsc`).
+- Create the tables once from the API service console: `npx prisma db push`.
+
+### Vercel (frontend)
+
+- Root directory `frontend`, build command `npm run build`, output directory `dist`.
+- `frontend/vercel.json` holds the `/api` and `/auth` rewrites plus the SPA fallback to `index.html`.
+- Don't set `VITE_API_URL` in production; it would bypass the proxy.
+
+---
+
+## Demo Walkthrough
+
+1. **Create scheduled emails:** Compose → click the recipient field and pick the suggested address (or upload a CSV) → fill in subject, body, start time, delay and rate limit → Schedule Campaign.
+2. **Dashboard, Scheduled and Sent:** the Scheduled page lists queued emails and refreshes every 10 seconds; delivered emails move to Sent with their provider message ID.
+3. **Restart scenario:** schedule a campaign a few minutes ahead, then restart the worker (Railway → MailFlow-Worker → Restart, or Ctrl+C and `npm run dev:worker` locally). On startup the worker logs `Starting startup reconciliation...`, re-queues SCHEDULED/PENDING jobs from PostgreSQL, and the emails still go out.
+4. **Rate limiting under load:** set Rate Limit to 1 and Delay to 0 with several recipients. One email is sent per minute and the rest are rescheduled to the next window (worker log: `Rate limit reached — rescheduling email job`). Use a local Ethereal setup to demo many recipients, since production only delivers to the demo address.
+
+---
+
 ## Features Implemented
 
 ### Backend Features
@@ -404,6 +487,7 @@ Race Condition Prevention:
 | **Idempotency** | DB status check before send + unique jobIds | `emailWorker.ts` |
 | **State Machine** | PENDING → SCHEDULED → PROCESSING → SENT/FAILED | Prisma schema |
 | **Google OAuth** | Passport.js strategy | `passport.ts`, `authController.ts` |
+| **Email Delivery** | Resend HTTP API when `RESEND_API_KEY` is set, SMTP (Nodemailer) otherwise | `emailService.ts`, `mailer.ts` |
 | **CSV Parsing** | Server-side validation | `csvParser.ts` |
 | **Graceful Shutdown** | SIGTERM/SIGINT handlers | `index.ts`, `emailWorker.ts` |
 
@@ -415,6 +499,7 @@ Race Condition Prevention:
 | **Dashboard** | Animated stats, recent campaigns | `DashboardPage.tsx` |
 | **Compose Form** | Recipients, CSV upload, scheduling | `ComposePage.tsx` |
 | **Draft Persistence** | localStorage auto-save | `ComposePage.tsx` |
+| **Demo Recipient Hint** | Suggests the only deliverable address, plus a demo-mode note | `ComposePage.tsx` |
 | **Scheduled Table** | Auto-refresh (10s), search, stats | `ScheduledPage.tsx` |
 | **Sent Table** | Auto-refresh, copy message ID | `SentPage.tsx` |
 | **Status Badges** | Color-coded with animations | `StatusBadge.tsx` |
@@ -445,8 +530,8 @@ Race Condition Prevention:
 1. **Single Tenant**: One user owns all their campaigns (no sharing/teams)
 2. **Email Delivery**: SMTP is reliable; no delivery tracking beyond "sent"
 3. **Time Zones**: All times stored in UTC, displayed in browser local time
-4. **Rate Limit Window**: Per-minute for demo (easily changed to per-hour)
-5. **Session Storage**: In-memory (would use Redis session store in production)
+4. **Rate Limit Window**: Per-minute by default (`RATE_LIMIT_WINDOW_SECONDS=3600` for per-hour)
+5. **Session Storage**: In-memory, so a backend redeploy logs everyone out (would use a Redis or Postgres session store in production)
 
 ### Trade-offs
 
@@ -458,6 +543,9 @@ Race Condition Prevention:
 | **Per-campaign rate limit** | Not global rate limit | More granular control per campaign |
 | **Polling for updates** | Not real-time WebSocket | Simpler implementation, 10s refresh is acceptable |
 | **Ethereal for dev** | Emails not actually sent | Safe testing, easy setup |
+| **Resend API in production** | Free tier only delivers to the owner's address | Railway blocks outbound SMTP; an HTTP API works from any host |
+| **Vercel rewrites for the API** | Extra network hop | Session cookie is first-party, so privacy-focused browsers don't block login |
+| **`hourlyLimit` column name** | Name no longer matches meaning | Kept to avoid a schema migration; the value is per window (per minute by default) |
 
 ### Shortcuts Taken
 
@@ -466,6 +554,7 @@ Race Condition Prevention:
 3. **No email tracking**: No open/click tracking (would need tracking pixel/links)
 4. **No campaign editing**: Once scheduled, cannot modify (would need cancel/reschedule)
 5. **No email preview**: Basic HTML render (would need proper email preview)
+6. **Interrupted sends**: a job that crashes mid-send stays PROCESSING; startup reconciliation only re-queues PENDING and SCHEDULED jobs (production would add a stale-job sweeper)
 
 ### Production Improvements Needed
 
@@ -474,8 +563,10 @@ Race Condition Prevention:
 3. **Email Templates**: Rich template system with variables
 4. **Monitoring**: Add APM (DataDog, New Relic)
 5. **Logging**: Ship logs to centralized system
-6. **Testing**: Add unit/integration tests
+6. **Testing**: Add integration and end-to-end tests (unit tests cover the scheduling logic)
 7. **CI/CD**: Add GitHub Actions pipeline
+8. **Email Domain**: Verify a sending domain in Resend so any recipient can receive mail
+9. **Dependencies**: Upgrade Nodemailer to a major version without the `npm audit` advisory
 
 ---
 
@@ -506,11 +597,12 @@ outbox/
 │   │   ├── pages/           # Page components
 │   │   ├── services/        # API client
 │   │   └── types/           # TypeScript types
+│   ├── vercel.json          # Vercel rewrites (/api, /auth -> Railway) + SPA fallback
 │   └── package.json
 │
 ├── docker-compose.yml       # PostgreSQL + Redis
+├── railway.json             # Railway build command
 ├── .env.example             # Environment template
-├── DEMO_SCRIPT.md           # Evaluation demo guide
 └── README.md                # This file
 ```
 

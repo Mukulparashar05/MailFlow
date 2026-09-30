@@ -48,3 +48,6 @@ temp/
 *.key
 *_secret*
 *_credentials*
+
+# Personal demo notes (kept locally, not part of the submission)
+DEMO_SCRIPT.md

@@ -4,14 +4,14 @@ import { logger } from '../config/logger';
 /**
  * Distributed Rate Limiter using Redis
  *
- * Strategy: Sliding window counter per campaign per configurable window.
- * Uses INCR + EXPIRE in a Lua script for atomic operation.
+ * Strategy: fixed-window counter per campaign.
+ * INCR + EXPIRE run in a Lua script, so check-and-increment is atomic across workers.
  *
  * Key format: rate_limit:{campaignId}:{windowTimestamp}
- * 
+ *
  * Environment Variables:
- * - RATE_LIMIT_WINDOW_SECONDS: Window size in seconds (default: 3600 = 1 hour)
- *   Set to 60 for per-minute limiting during testing
+ * - RATE_LIMIT_WINDOW_SECONDS: Window size in seconds (default: 60 = per minute,
+ *   matching the "per minute" limit shown in the UI). Set 3600 for per-hour limits.
  */
 
 const RATE_LIMIT_LUA = `
@@ -33,8 +33,8 @@ end
 return current
 `;
 
-// Configurable window: default 3600 (1 hour), can set to 60 (1 minute) for testing
-const RATE_LIMIT_WINDOW = parseInt(process.env.RATE_LIMIT_WINDOW_SECONDS || '3600', 10);
+// Window size in seconds: default 60 (per minute, as shown in the UI); set 3600 for per-hour
+const RATE_LIMIT_WINDOW = parseInt(process.env.RATE_LIMIT_WINDOW_SECONDS || '60', 10);
 
 export interface RateLimitResult {
   allowed: boolean;

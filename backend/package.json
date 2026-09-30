@@ -17,7 +17,6 @@
     "db:studio": "prisma studio",
     "test": "jest --runInBand",
     "test:watch": "jest --watch --runInBand",
-    "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

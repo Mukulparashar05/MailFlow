@@ -9,8 +9,12 @@ import type {
   ApiResponse,
 } from '../types';
 
+// Use environment variable for API base URL in production
+// In dev, Vite proxy handles /api routes
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
 const api = axios.create({
-  baseURL: '',
+  baseURL: API_BASE_URL,
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -35,7 +39,7 @@ export const authApi = {
   logout: () => api.post<ApiResponse<void>>('/api/auth/logout'),
   devLogin: (email?: string, name?: string) =>
     api.post<ApiResponse<User>>('/api/auth/dev-login', { email, name }),
-  googleLoginUrl: '/auth/google',
+  googleLoginUrl: `${API_BASE_URL}/auth/google`,
 };
 
 // Campaigns
@@ -58,7 +62,7 @@ export const emailApi = {
 // Slack
 export const slackApi = {
   status: () => api.get<ApiResponse<SlackStatus>>('/api/slack/status'),
-  connectUrl: '/api/slack/connect',
+  connectUrl: `${API_BASE_URL}/api/slack/connect`,
   disconnect: () => api.post<ApiResponse<void>>('/api/slack/disconnect'),
 };
 

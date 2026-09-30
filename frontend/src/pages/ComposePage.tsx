@@ -6,7 +6,6 @@ import type { CsvParseResult } from '../types';
 import {
   Upload,
   X,
-  Plus,
   Mail,
   Clock,
   Gauge,
@@ -280,8 +279,7 @@ export function ComposePage() {
               onClick={addRecipient}
               className="btn-secondary px-5"
             >
-              <Plus className="w-5 h-5" />
-              <span className="hidden sm:inline">Add</span>
+              <span>Add</span>
             </button>
           </div>
 

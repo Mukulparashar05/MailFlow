@@ -17,7 +17,7 @@ import emailRoutes from './routes/emails';
 import slackRoutes from './routes/slack';
 
 const app = express();
-const PORT = parseInt(process.env.PORT || '3001', 10);
+const PORT = parseInt(process.env.PORT || '3000', 10);
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // Security

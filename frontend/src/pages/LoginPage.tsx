@@ -118,7 +118,7 @@ export function LoginPage() {
           {/* Card */}
           <div className="glass-card p-8 space-y-6 opacity-0 animate-slide-up" style={{ animationDelay: '200ms', animationFillMode: 'forwards' }}>
             <div className="text-center">
-              <h1 className="text-3xl font-bold text-white">Welcome back</h1>
+              <h1 className="text-3xl font-bold text-white">Welcome</h1>
               <p className="text-slate-400 mt-2 text-sm">
                 Sign in to access your email scheduler
               </p>

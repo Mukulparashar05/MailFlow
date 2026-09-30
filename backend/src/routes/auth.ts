@@ -23,12 +23,24 @@ router.get(
 // Google OAuth callback
 router.get(
   '/google/callback',
-  passport.authenticate('google', {
-    failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=auth_failed`,
-    session: true,
-  }),
-  (req, res) => {
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard`);
+  (req, res, next) => {
+    passport.authenticate('google', (err: Error | null, user: Express.User | false | null, info: unknown) => {
+      if (err) {
+        console.error('OAuth callback error:', err);
+        return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=auth_failed&reason=${encodeURIComponent(err.message)}`);
+      }
+      if (!user) {
+        console.error('OAuth callback: no user returned', info);
+        return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=auth_failed&reason=no_user`);
+      }
+      req.logIn(user, (loginErr) => {
+        if (loginErr) {
+          console.error('OAuth login error:', loginErr);
+          return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=auth_failed&reason=${encodeURIComponent(loginErr.message)}`);
+        }
+        return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard`);
+      });
+    })(req, res, next);
   },
 );
 
